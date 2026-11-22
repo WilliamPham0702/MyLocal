@@ -78,6 +78,14 @@ final class SpoofSession: ObservableObject {
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
+    /// Vị trí hiện tại để vẽ mũi tên đỏ (thật, hoặc giả khi đang giả lập).
+    @Published var liveCoordinate: CLLocationCoordinate2D?
+    /// Hướng la bàn (độ).
+    @Published var heading: Double = 0
+    /// Khi vừa tới nơi (nhảy tới hoặc đi hết đường) → hiện nút Sao để lưu.
+    @Published var arrivedAt: CLLocationCoordinate2D?
+    /// Đang tự đi theo đường.
+    @Published var isFollowingRoute = false
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []
@@ -96,6 +104,12 @@ final class SpoofSession: ObservableObject {
     init() {
         favorites = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.load(key: recentsKey)
+        locationKeeper.onLocation = { [weak self] coordinate in
+            Task { @MainActor in self?.liveCoordinate = coordinate }
+        }
+        locationKeeper.onHeading = { [weak self] value in
+            Task { @MainActor in self?.heading = value }
+        }
     }
 
     var isSpoofing: Bool {
@@ -106,16 +120,26 @@ final class SpoofSession: ObservableObject {
 
     func teleport(to coordinate: CLLocationCoordinate2D, pairing: PairingStore) {
         guard pairing.hasPairingFile else {
-            lastError = "Hãy nhập file RPPairing trong Cài đặt trước."
+            lastError = "Hãy nhập file pairing trong Cài đặt trước."
             return
         }
+        routeTask?.cancel()
+        isFollowingRoute = false
+        arrivedAt = nil
         pin = coordinate
         apply(coordinate, pairing: pairing, markRecent: true)
+        if let sim = simulated,
+           abs(sim.latitude - coordinate.latitude) < 0.000001,
+           abs(sim.longitude - coordinate.longitude) < 0.000001 {
+            arrivedAt = coordinate
+        }
     }
 
     func stop(pairing: PairingStore) {
         routeTask?.cancel()
         routeTask = nil
+        isFollowingRoute = false
+        arrivedAt = nil
         stopJoystick()
         stopResend()
         stopHealth()
@@ -149,7 +173,7 @@ final class SpoofSession: ObservableObject {
 
     func startJoystick(pairing: PairingStore) {
         guard pairing.hasPairingFile else {
-            lastError = "Hãy nhập file RPPairing trong Cài đặt trước."
+            lastError = "Hãy nhập file pairing trong Cài đặt trước."
             return
         }
         let start = simulated ?? pin ?? locationKeeper.lastKnownCoordinate
@@ -160,6 +184,7 @@ final class SpoofSession: ObservableObject {
         if simulated == nil {
             apply(start, pairing: pairing, markRecent: false)
         }
+        arrivedAt = nil
         joystickActive = true
         joystickTimer?.invalidate()
         joystickTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
@@ -184,6 +209,8 @@ final class SpoofSession: ObservableObject {
         guard pairing.hasPairingFile, coordinates.count >= 2 else { return }
         routeTask?.cancel()
         stopJoystick()
+        arrivedAt = nil
+        isFollowingRoute = true
         let mode = travelMode
         routeTask = Task { [weak self] in
             guard let self else { return }
@@ -213,6 +240,13 @@ final class SpoofSession: ObservableObject {
                     }
                 }
                 previous = next
+            }
+            let finished = !Task.isCancelled
+            await MainActor.run {
+                self.isFollowingRoute = false
+                if finished, let last = coordinates.last, self.isSpoofing {
+                    self.arrivedAt = last
+                }
             }
         }
     }

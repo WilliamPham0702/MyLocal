@@ -15,15 +15,15 @@ Repo này chỉ chứa phần thay đổi (`overlay/`). Khi build, GitHub Action
 
 ## 2. Chuẩn bị trên iPhone (iOS 26)
 1. Bật **Developer Mode**: Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.
-2. Tạo file **RPPairing** (làm 1 lần, cần máy tính Windows/Mac/Linux):
-   - Tải idevice_pair: https://github.com/jkcoxson/idevice_pair/releases
-   - Cắm iPhone, mở khóa, bấm Tin cậy → tạo file ở chế độ **RPPairing**.
-   - Lưu ý: file `.mobiledevicepairing` của SideStore **không dùng được**.
-3. Gửi file RPPairing vào iPhone (AirDrop/Zalo/Files) → mở app MyLocal → Nhập file pairing (hoặc sao chép nội dung rồi bấm Dán).
+2. Mở MyLocal → **Nhập file pairing** → chọn file pairing đã dùng cho SideStore (đuôi `.mobiledevicepairing` hoặc `.plist`) trong app Tệp. Chỉ làm 1 lần.
+   - Cũng nhận file RPPairing tạo bằng idevice_pair (nếu có).
+3. Lý do cần bước này: iOS không cho app này dùng chung quyền với SideStore, nên app cần chính file đó để gọi dịch vụ giả lập vị trí của iPhone.
 4. Cài **LocalDevVPN** từ App Store, bật lên, giữ IP mặc định `10.7.0.1`.
 
 ## 3. Sử dụng
-- Chạm bản đồ để thả ghim, hoặc tìm địa chỉ / nhập tọa độ → **Dịch chuyển**.
+- **Mũi tên đỏ** là vị trí hiện tại. Giữ mũi tên rồi kéo tới nơi muốn đến → chọn **Nhảy tới ngay** hoặc **Đi tới theo đường** (theo kiểu đi bộ / chạy / xe đạp / ô tô đang chọn).
+- Tới nơi sẽ hiện thẻ **Đã tới nơi** → bấm ⭐ → đặt tên → lưu vào Yêu thích.
+- Hoặc chạm bản đồ để thả ghim, tìm địa chỉ / nhập tọa độ → **Dịch chuyển**.
 - Ngôi sao trên bản đồ: lưu điểm yêu thích (xem lại ở nút ngôi sao dưới thanh công cụ).
 - **Dừng**: trả về vị trí thật.
 - Lần dịch chuyển đầu tiên nên dùng Wi‑Fi.

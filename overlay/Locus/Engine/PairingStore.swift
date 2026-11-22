@@ -119,9 +119,9 @@ enum PairingImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyClipboard:
-            return "Bộ nhớ tạm trống. Hãy sao chép nội dung file RPPairing rồi bấm Dán lại."
+            return "Bộ nhớ tạm trống. Hãy sao chép nội dung file pairing rồi bấm Dán lại."
         case .invalidContents:
-            return "Nội dung này không phải file RPPairing. Hãy sao chép toàn bộ nội dung file rồi thử lại."
+            return "Nội dung này không phải file pairing. Hãy sao chép toàn bộ nội dung file rồi thử lại."
         }
     }
 }

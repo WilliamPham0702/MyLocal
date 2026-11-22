@@ -14,7 +14,7 @@ enum LocationEngineError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidIP: return "IP đường hầm không hợp lệ. Vào Cài đặt → IP đường hầm (thường là 10.7.0.1)."
-        case .pairingRead: return "Không đọc được file RPPairing. Hãy tạo lại bằng idevice_pair ở chế độ RPPairing."
+        case .pairingRead: return "Không đọc được file pairing. Hãy nhập lại file pairing của SideStore (.mobiledevicepairing)."
         case .tunnelCreate: return "Không mở được đường hầm developer. LocalDevVPN đã bật và đang dùng Wi‑Fi chưa?"
         case .remoteServer: return "Đã vào đường hầm nhưng bắt tay RemoteXPC thất bại."
         case .simulationCreate: return "Không mở được dịch vụ giả lập vị trí của Apple."
@@ -111,32 +111,42 @@ enum LocationEngine {
         let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
         guard inetResult == 1 else { return invalidIP }
 
-        var pairingHandle: OpaquePointer?
-        if let pairingError = pairingPath.withCString({ rp_pairing_file_read($0, &pairingHandle) }) {
-            idevice_error_free(pairingError)
-            return pairingRead
+        // 1) File RPPairing (tạo bằng idevice_pair)
+        var rpHandle: OpaquePointer?
+        if let rpError = pairingPath.withCString({ rp_pairing_file_read($0, &rpHandle) }) {
+            idevice_error_free(rpError)
+            rpHandle = nil
         }
-        guard let pairingHandle else { return pairingRead }
-        defer { rp_pairing_file_free(pairingHandle) }
 
-        let providerError = withUnsafePointer(to: &address) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                tunnel_create_rppairing(
-                    $0,
-                    socklen_t(MemoryLayout<sockaddr_in>.stride),
-                    "LocusLocation",
-                    pairingHandle,
-                    nil,
-                    nil,
-                    &adapter,
-                    &handshake
-                )
+        if let rpHandle {
+            defer { rp_pairing_file_free(rpHandle) }
+            let providerError = withUnsafePointer(to: &address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    tunnel_create_rppairing(
+                        $0,
+                        socklen_t(MemoryLayout<sockaddr_in>.stride),
+                        "LocusLocation",
+                        rpHandle,
+                        nil,
+                        nil,
+                        &adapter,
+                        &handshake
+                    )
+                }
             }
-        }
-        if let providerError {
-            idevice_error_free(providerError)
-            cleanup()
-            return tunnelCreate
+            if let providerError {
+                idevice_error_free(providerError)
+                cleanup()
+                return tunnelCreate
+            }
+        } else {
+            // 2) File pairing của SideStore / jitterbugpair (.mobiledevicepairing)
+            //    lockdown → CoreDeviceProxy → TCP adapter → RSD (cách StikDebug dùng)
+            let code = openLockdownTunnel(pairingPath: pairingPath, ip: deviceIP)
+            if code != ok {
+                cleanup()
+                return code
+            }
         }
 
         if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
@@ -157,6 +167,68 @@ enum LocationEngine {
             idevice_error_free(setError)
             cleanup()
             return locationSet
+        }
+        return ok
+    }
+
+    private static func openLockdownTunnel(pairingPath: String, ip: String) -> Int32 {
+        var lockdownAddress = sockaddr_in()
+        lockdownAddress.sin_family = sa_family_t(AF_INET)
+        lockdownAddress.sin_port = in_port_t(62078).bigEndian
+        let inetResult = ip.withCString { inet_pton(AF_INET, $0, &lockdownAddress.sin_addr) }
+        guard inetResult == 1 else { return invalidIP }
+
+        var pairingFile: OpaquePointer?
+        if let err = pairingPath.withCString({ idevice_pairing_file_read($0, &pairingFile) }) {
+            idevice_error_free(err)
+            return pairingRead
+        }
+        guard let pairingFile else { return pairingRead }
+
+        // pairing_file bị provider tiêu thụ, không free lại.
+        var provider: OpaquePointer?
+        let providerError = withUnsafePointer(to: &lockdownAddress) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                idevice_tcp_provider_new($0, pairingFile, "MyLocal", &provider)
+            }
+        }
+        if let providerError {
+            idevice_error_free(providerError)
+            return tunnelCreate
+        }
+        guard let provider else { return tunnelCreate }
+        defer { idevice_provider_free(provider) }
+
+        var proxy: OpaquePointer?
+        if let err = core_device_proxy_connect(provider, &proxy) {
+            idevice_error_free(err)
+            return tunnelCreate
+        }
+        guard let proxy else { return tunnelCreate }
+
+        var rsdPort: UInt16 = 0
+        if let err = core_device_proxy_get_server_rsd_port(proxy, &rsdPort) {
+            idevice_error_free(err)
+            core_device_proxy_free(proxy)
+            return tunnelCreate
+        }
+
+        // proxy bị adapter tiêu thụ.
+        if let err = core_device_proxy_create_tcp_adapter(proxy, &adapter) {
+            idevice_error_free(err)
+            return tunnelCreate
+        }
+
+        var stream: OpaquePointer?
+        if let err = adapter_connect(adapter, rsdPort, &stream) {
+            idevice_error_free(err)
+            return remoteServerCode
+        }
+
+        // stream bị handshake tiêu thụ.
+        if let err = rsd_handshake_new(stream, &handshake) {
+            idevice_error_free(err)
+            return remoteServerCode
         }
         return ok
     }

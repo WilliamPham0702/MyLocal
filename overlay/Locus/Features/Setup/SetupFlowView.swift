@@ -224,7 +224,7 @@ struct SetupFlowView: View {
                     .font(.title.weight(.bold))
                 Text(supportsOnDevicePairing
                      ? "Locus needs a one-time pairing so it can set your location. You’ll confirm a short code in Settings."
-                     : "Nhập file pairing tạo từ máy tính. App dùng file này để đặt vị trí ngay trên iPhone.")
+                     : "Chỉ làm 1 lần. iOS không cho MyLocal dùng chung quyền với SideStore, nên bạn đưa cho app chính file pairing đã dùng cho SideStore.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -272,9 +272,9 @@ struct SetupFlowView: View {
 
     private var importPairingCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            stepRow(1, "Trên máy tính, chạy idevice_pair và tạo file RPPairing.")
-            stepRow(2, "AirDrop/Chia sẻ file vào app, hoặc sao chép nội dung plist.")
-            stepRow(3, "Bấm Nhập, hoặc Dán từ bộ nhớ tạm nếu không chọn được file.")
+            stepRow(1, "Mở app Tệp, tìm file pairing đã dùng cho SideStore (đuôi .mobiledevicepairing hoặc .plist).")
+            stepRow(2, "Bấm Nhập file pairing bên dưới và chọn file đó.")
+            stepRow(3, "Xong. Lần sau mở app không phải làm lại.")
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

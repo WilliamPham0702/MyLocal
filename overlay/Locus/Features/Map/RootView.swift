@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 import NetworkExtension
 
@@ -13,12 +14,19 @@ struct RootView: View {
         ZStack(alignment: .bottom) {
             MapHomeView()
 
-            BottomControlsView(
-                showSettings: $showSettings,
-                showPlaces: $showPlaces
-            )
+            VStack(spacing: 10) {
+                if let arrived = session.arrivedAt {
+                    ArrivalCard(coordinate: arrived)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                BottomControlsView(
+                    showSettings: $showSettings,
+                    showPlaces: $showPlaces
+                )
+            }
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: session.arrivedAt?.latitude)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -289,5 +297,82 @@ struct IconButton: View {
         .buttonStyle(.plain)
         .locusGlass(.interactive, in: Circle())
         .foregroundStyle(.primary)
+    }
+}
+
+/// Hiện khi vừa tới nơi: bấm Sao → đặt tên → lưu vào Yêu thích.
+struct ArrivalCard: View {
+    @EnvironmentObject private var session: SpoofSession
+    let coordinate: CLLocationCoordinate2D
+
+    @State private var showNameAlert = false
+    @State private var nameText = ""
+    @State private var saved = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(saved ? "Đã lưu vào Yêu thích" : "Đã tới nơi")
+                    .font(.subheadline.weight(.bold))
+                Text(String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Button {
+                prepareName()
+                showNameAlert = true
+            } label: {
+                Image(systemName: saved ? "star.fill" : "star")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.yellow)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.primary.opacity(0.08)))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Lưu điểm này")
+            Button {
+                session.arrivedAt = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Đóng")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onChange(of: coordinate.latitude) { _, _ in saved = false }
+        .alert("Lưu điểm này", isPresented: $showNameAlert) {
+            TextField("Tên điểm, ví dụ: Công ty", text: $nameText)
+            Button("Hủy", role: .cancel) {}
+            Button("Lưu") {
+                session.addFavorite(name: nameText, coordinate: coordinate)
+                saved = true
+            }
+        } message: {
+            Text("Đặt tên để lần sau chọn nhanh trong mục Yêu thích (nút ngôi sao).")
+        }
+    }
+
+    private func prepareName() {
+        let suggested = session.suggestedFavoriteName(for: coordinate)
+        nameText = suggested
+        // Gợi ý tên đường nếu có.
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in
+            guard let place = placemarks?.first else { return }
+            let parts = [place.subThoroughfare, place.thoroughfare].compactMap { $0 }
+            let street = parts.isEmpty ? (place.name ?? "") : parts.joined(separator: " ")
+            guard !street.isEmpty else { return }
+            DispatchQueue.main.async {
+                if nameText == suggested { nameText = street }
+            }
+        }
     }
 }

@@ -22,12 +22,19 @@ struct MapHomeView: View {
     @State private var suppressNextMapTap = false
     /// Set when the pin comes from search / a named place so starring keeps the title.
     @State private var pinPlaceName: String?
+    /// Mũi tên đỏ: vị trí tạm khi đang kéo.
+    @State private var arrowDragCoordinate: CLLocationCoordinate2D?
+    @State private var isDraggingArrow = false
+    /// Điểm vừa thả mũi tên → hỏi Nhảy tới / Đi tới.
+    @State private var pendingDestination: CLLocationCoordinate2D?
+    @State private var showGoDialog = false
 
     private var mapStyle: MapStyle {
         switch session.mapStyleIndex {
         case 1: return .hybrid(elevation: .realistic)
         case 2: return .imagery(elevation: .realistic)
-        default: return .standard(elevation: .realistic)
+        // Mặc định: bản đồ đường phố phẳng, nền tối, có địa điểm — giống Google Maps.
+        default: return .standard(elevation: .flat, pointsOfInterest: .all, showsTraffic: false)
         }
     }
 
@@ -38,7 +45,38 @@ struct MapHomeView: View {
             // shifts convert() upward by ~status-bar height.
             MapReader { proxy in
                 Map(position: $position) {
-                    UserAnnotation()
+                    if let here = arrowDragCoordinate ?? session.simulated ?? session.liveCoordinate {
+                        Annotation("", coordinate: here, anchor: .center) {
+                            RedArrowMarker(
+                                heading: session.heading,
+                                isDragging: isDraggingArrow,
+                                onDragBegan: {
+                                    searchFocused = false
+                                    suppressNextMapTap = true
+                                    isDraggingArrow = true
+                                    session.stopJoystick()
+                                },
+                                onDragMoved: { globalPoint in
+                                    if let coord = proxy.convert(globalPoint, from: .global) {
+                                        arrowDragCoordinate = coord
+                                    }
+                                },
+                                onDragEnded: {
+                                    isDraggingArrow = false
+                                    if let dest = arrowDragCoordinate {
+                                        pendingDestination = dest
+                                        session.pin = dest
+                                        pinPlaceName = nil
+                                        showGoDialog = true
+                                    }
+                                    arrowDragCoordinate = nil
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                        suppressNextMapTap = false
+                                    }
+                                }
+                            )
+                        }
+                    }
 
                     if let pin = session.pin {
                         Annotation("", coordinate: pin, anchor: .bottom) {
@@ -85,15 +123,6 @@ struct MapHomeView: View {
                             )
                         }
                     }
-                    if let sim = session.simulated {
-                        Annotation("Vị trí giả", coordinate: sim) {
-                            ZStack {
-                                Circle().fill(LocusTheme.accent.opacity(0.25)).frame(width: 44, height: 44)
-                                Circle().fill(LocusTheme.accent).frame(width: 14, height: 14)
-                                    .overlay(Circle().stroke(.white, lineWidth: 2))
-                            }
-                        }
-                    }
                     if routeCoords.count > 1 {
                         MapPolyline(coordinates: routeCoords)
                             .stroke(LocusTheme.accent, lineWidth: 5)
@@ -130,6 +159,30 @@ struct MapHomeView: View {
             if case .success(let urls) = result, let url = urls.first {
                 importGPX(url)
             }
+        }
+        .confirmationDialog(
+            "Đến điểm này bằng cách nào?",
+            isPresented: $showGoDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Nhảy tới ngay") {
+                if let dest = pendingDestination {
+                    routeCoords = []
+                    session.teleport(to: dest, pairing: pairing)
+                }
+                pendingDestination = nil
+            }
+            Button("Đi tới theo đường (\(session.travelMode.title))") {
+                if let dest = pendingDestination {
+                    travel(to: dest)
+                }
+                pendingDestination = nil
+            }
+            Button("Hủy", role: .cancel) {
+                pendingDestination = nil
+            }
+        } message: {
+            Text("Nhảy tới: đổi vị trí ngay. Đi tới: di chuyển dần theo đường phố với kiểu đang chọn (đi bộ, chạy, xe đạp, ô tô).")
         }
         .sheet(isPresented: $showRouteSheet) {
             RoutePlannerSheet(
@@ -403,6 +456,34 @@ struct MapHomeView: View {
                     session.addFavorite(name: title, coordinate: coord)
                     session.pushNamedRecent(name: title, coordinate: coord)
                 }
+            }
+        }
+    }
+
+    /// Đi dần từ vị trí hiện tại tới đích theo đường phố.
+    private func travel(to destination: CLLocationCoordinate2D) {
+        guard pairing.hasPairingFile else {
+            session.lastError = "Hãy nhập file pairing trong Cài đặt trước."
+            return
+        }
+        guard let start = session.simulated ?? session.liveCoordinate ?? session.realCoordinate else {
+            session.teleport(to: destination, pairing: pairing)
+            return
+        }
+        isRouting = true
+        Task {
+            let coords: [CLLocationCoordinate2D]
+            if let road = try? await RouteBuilder.roadRoute(from: start, to: destination, mode: session.travelMode),
+               road.count > 1 {
+                coords = road + [destination]
+            } else {
+                // Không tìm được đường phố → đi thẳng.
+                coords = [start, destination]
+            }
+            await MainActor.run {
+                isRouting = false
+                routeCoords = coords
+                session.followRoute(coords, pairing: pairing)
             }
         }
     }

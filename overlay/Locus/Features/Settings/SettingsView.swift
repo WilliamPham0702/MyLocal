@@ -29,7 +29,7 @@ struct SettingsView: View {
             List {
                 Section {
                     Label {
-                        Text(pairing.hasPairingFile ? "Đã có file RPPairing" : "Chưa có file pairing")
+                        Text(pairing.hasPairingFile ? "Đã có file pairing" : "Chưa có file pairing")
                     } icon: {
                         Image(systemName: pairing.hasPairingFile ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                             .foregroundStyle(pairing.hasPairingFile ? LocusTheme.statusGood : LocusTheme.statusWarn)
@@ -43,8 +43,8 @@ struct SettingsView: View {
                         }
                     }
 
-                    Button("Nhập file RPPairing…") { showImporter = true }
-                    Button("Dán RPPairing từ bộ nhớ tạm") {
+                    Button("Nhập file pairing…") { showImporter = true }
+                    Button("Dán file pairing từ bộ nhớ tạm") {
                         do {
                             try pairing.importPairingFromClipboard()
                         } catch {
@@ -61,7 +61,7 @@ struct SettingsView: View {
                 } footer: {
                     Text(supportsOnDevicePairing
                          ? "On iOS 27, use Pair on this iPhone — no computer. Locus advertises a pairable host; confirm the 6-digit code under Settings › Privacy & Security › Developer Mode › Pair with Host. On older iOS, import an RPPairing file from idevice_pair (not a SideStore lockdown .mobiledevicepairing). LiveContainer: enable Fix File Picker on Locus, or use Paste / Share → LiveContainer → Locus."
-                         : "Nhập file RPPairing tạo bằng idevice_pair (KHÔNG dùng file .mobiledevicepairing của SideStore). Nếu không chọn được file, hãy sao chép nội dung plist rồi bấm Dán.")
+                         : "Dùng file pairing của SideStore (.mobiledevicepairing) hoặc file RPPairing từ idevice_pair. Chỉ cần nhập 1 lần.")
                 }
 
                 Section {
