@@ -9,7 +9,7 @@ env:
   # Ban Locus goc dung lam nen (21/11/2026). Doi SHA nay neu muon cap nhat len ban moi.
   LOCUS_REPO: https://github.com/ChrisMack32/Locus.git
   LOCUS_SHA: bd0c1c39509ddc76ffe2c295624df903132b556f
-  IPA_NAME: DoiViTri
+  IPA_NAME: MyLocal
 
 jobs:
   build:

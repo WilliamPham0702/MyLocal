@@ -31,7 +31,7 @@ targets:
         buildPhase: none
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.phamnhutthanh.doivitri
+        PRODUCT_BUNDLE_IDENTIFIER: com.phamnhutthanh.mylocal
         PRODUCT_NAME: Locus
         MARKETING_VERSION: "1.0.3"
         CURRENT_PROJECT_VERSION: "4"

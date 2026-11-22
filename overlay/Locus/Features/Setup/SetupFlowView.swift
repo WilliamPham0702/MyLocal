@@ -96,7 +96,7 @@ struct SetupFlowView: View {
             )
             .ignoresSafeArea()
         }
-        .alert("Đổi Vị Trí", isPresented: Binding(
+        .alert("MyLocal", isPresented: Binding(
             get: { session.lastError != nil },
             set: { if !$0 { session.lastError = nil } }
         )) {
@@ -182,7 +182,7 @@ struct SetupFlowView: View {
                     .scaleEffect(appear ? 1 : 0.85)
 
                 VStack(spacing: 10) {
-                    Text("Đổi Vị Trí")
+                    Text("MyLocal")
                         .font(.system(size: 48, weight: .bold, design: .rounded))
                         .tracking(-0.5)
 

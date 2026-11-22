@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Đổi Vị Trí</string>
+	<string>MyLocal</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -95,7 +95,7 @@
 			<key>UTTypeDescription</key>
 			<string>Remote Pairing File</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.phamnhutthanh.doivitri.rppairing</string>
+			<string>com.phamnhutthanh.mylocal.rppairing</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -117,7 +117,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.phamnhutthanh.doivitri</string>
+			<string>com.phamnhutthanh.mylocal</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>locus</string>
