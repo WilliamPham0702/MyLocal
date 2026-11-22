@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -13,8 +14,16 @@ struct SettingsView: View {
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
     @Environment(\.scenePhase) private var scenePhase
 
-    private var supportsOnDevicePairing: Bool {
-        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+    // Luôn hiện nút ghép nối trên iPhone: app build bằng SDK cũ có thể đọc sai phiên bản iOS.
+    private var supportsOnDevicePairing: Bool { true }
+
+    private var detectedOSText: String {
+        var size = 0
+        sysctlbyname("kern.osproductversion", nil, &size, nil, 0)
+        var buffer = [CChar](repeating: 0, count: max(size, 1))
+        sysctlbyname("kern.osproductversion", &buffer, &size, nil, 0)
+        let kernel = String(cString: buffer)
+        return "Phiên bản iOS app đọc được: \(UIDevice.current.systemVersion) (hệ thống: \(kernel))"
     }
 
     private var appVersion: String {
@@ -58,9 +67,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Ghép nối developer")
                 } footer: {
-                    Text(supportsOnDevicePairing
-                         ? "iOS 27: bấm Ghép nối ngay trên iPhone, không cần máy tính. iOS \\(ProcessInfo.processInfo.operatingSystemVersionString). Nếu đang chạy trong LiveContainer mà ghép nối không được, hãy cài MyLocal trực tiếp bằng SideStore rồi ghép nối."
-                         : "Dùng file pairing của SideStore (.mobiledevicepairing) hoặc file RPPairing từ idevice_pair. Chỉ cần nhập 1 lần.")
+                    Text("iOS 27: bấm Ghép nối ngay trên iPhone, không cần máy tính. iOS 26: cần file RPPairing tạo bằng idevice_pair trên máy tính. Nếu chạy trong LiveContainer mà không thấy Locus ở mục Pair with Host, hãy cài MyLocal trực tiếp bằng SideStore.\n\n" + detectedOSText)
                 }
 
                 Section {

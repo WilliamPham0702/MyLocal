@@ -27,7 +27,12 @@ struct SetupFlowView: View {
     }
 
     private var supportsOnDevicePairing: Bool {
-        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+        var size = 0
+        sysctlbyname("kern.osproductversion", nil, &size, nil, 0)
+        var buffer = [CChar](repeating: 0, count: max(size, 1))
+        sysctlbyname("kern.osproductversion", &buffer, &size, nil, 0)
+        let major = Int(String(cString: buffer).split(separator: ".").first ?? "") ?? 0
+        return major >= 27 || ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
     }
 
     var body: some View {
