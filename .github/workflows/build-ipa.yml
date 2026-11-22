@@ -11,6 +11,9 @@ env:
   LOCUS_SHA: bd0c1c39509ddc76ffe2c295624df903132b556f
   IPA_NAME: MyLocal
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -70,3 +73,14 @@ jobs:
           name: ${{ env.IPA_NAME }}-unsigned
           path: ${{ env.IPA_NAME }}.ipa
           if-no-files-found: error
+
+      - name: Phat hanh Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: MyLocal v1.0.${{ github.run_number }}
+          body: |
+            File IPA chua ky. Tai MyLocal.ipa ben duoi, ky va cai bang SideStore.
+            Huong dan cai dat: xem HUONG-DAN.md trong repo.
+          files: ${{ env.IPA_NAME }}.ipa
+          make_latest: true
