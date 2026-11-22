@@ -108,7 +108,7 @@ final class PairOnDeviceService: ObservableObject {
     fileprivate func handleConnected() {
         phase = .deviceConnected
         Self.postPlainNotification(
-            title: "Locus connected",
+            title: "Đã kết nối",
             body: "Đang tạo mã ghép nối…"
         )
     }
@@ -125,7 +125,7 @@ final class PairOnDeviceService: ObservableObject {
         phase = .succeeded
         teardown()
         Self.postPlainNotification(
-            title: "Locus paired",
+            title: "Ghép nối xong",
             body: "RPPairing đã sẵn sàng. Bật LocalDevVPN rồi dịch chuyển."
         )
     }
@@ -166,7 +166,7 @@ final class PairOnDeviceService: ObservableObject {
 
     private static func postPINNotification(_ pin: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Locus pairing code"
+        content.title = "Mã ghép nối MyLocal"
         content.body = pin
         content.sound = .default
         if #available(iOS 15.0, *) {

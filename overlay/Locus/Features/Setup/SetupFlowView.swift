@@ -27,8 +27,7 @@ struct SetupFlowView: View {
     }
 
     private var supportsOnDevicePairing: Bool {
-        if #available(iOS 27.0, *) { return true }
-        return false
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
     }
 
     var body: some View {
@@ -223,7 +222,7 @@ struct SetupFlowView: View {
                 Text("Kết nối iPhone này")
                     .font(.title.weight(.bold))
                 Text(supportsOnDevicePairing
-                     ? "Locus needs a one-time pairing so it can set your location. You’ll confirm a short code in Settings."
+                     ? "Chỉ làm 1 lần, không cần máy tính. App tự ghép nối với iPhone; bạn xác nhận một mã 6 số trong Cài đặt."
                      : "Chỉ làm 1 lần. iOS không cho MyLocal dùng chung quyền với SideStore, nên bạn đưa cho app chính file pairing đã dùng cho SideStore.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

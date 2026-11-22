@@ -14,8 +14,7 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var supportsOnDevicePairing: Bool {
-        if #available(iOS 27.0, *) { return true }
-        return false
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
     }
 
     private var appVersion: String {
@@ -39,7 +38,7 @@ struct SettingsView: View {
                         Button {
                             showPairOnDevice = true
                         } label: {
-                            Label("Pair on this iPhone", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                            Label("Ghép nối ngay trên iPhone (iOS 27)", systemImage: "iphone.gen3.radiowaves.left.and.right")
                         }
                     }
 
@@ -60,7 +59,7 @@ struct SettingsView: View {
                     Text("Ghép nối developer")
                 } footer: {
                     Text(supportsOnDevicePairing
-                         ? "On iOS 27, use Pair on this iPhone — no computer. Locus advertises a pairable host; confirm the 6-digit code under Settings › Privacy & Security › Developer Mode › Pair with Host. On older iOS, import an RPPairing file from idevice_pair (not a SideStore lockdown .mobiledevicepairing). LiveContainer: enable Fix File Picker on Locus, or use Paste / Share → LiveContainer → Locus."
+                         ? "iOS 27: bấm Ghép nối ngay trên iPhone, không cần máy tính. iOS \\(ProcessInfo.processInfo.operatingSystemVersionString). Nếu đang chạy trong LiveContainer mà ghép nối không được, hãy cài MyLocal trực tiếp bằng SideStore rồi ghép nối."
                          : "Dùng file pairing của SideStore (.mobiledevicepairing) hoặc file RPPairing từ idevice_pair. Chỉ cần nhập 1 lần.")
                 }
 
@@ -114,7 +113,7 @@ struct SettingsView: View {
                     Button {
                         showNameEasterEgg = true
                     } label: {
-                        Text("locus, n. — a place. From the Latin for where you are.")
+                        Text("locus: tiếng Latin nghĩa là nơi chốn.")
                             .font(.footnote.italic())
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

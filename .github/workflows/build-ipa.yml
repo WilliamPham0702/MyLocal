@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Lay code repo nay
         uses: actions/checkout@v4
@@ -25,6 +25,9 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      - name: Phien ban Xcode
+        run: xcodebuild -version && xcodebuild -showsdks | grep -i ios
 
       - name: Tai ma nguon Locus goc
         run: |

@@ -9,11 +9,13 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     var onLocation: ((CLLocationCoordinate2D) -> Void)?
     /// Gọi khi la bàn đổi hướng (độ, 0 = Bắc).
     var onHeading: ((Double) -> Void)?
+    /// Gọi khi người dùng chỉ cho phép vị trí gần đúng (lệch vài km).
+    var onReducedAccuracy: ((Bool) -> Void)?
 
     override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.pausesLocationUpdatesAutomatically = false
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = false
@@ -34,9 +36,22 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let coordinate = locations.last?.coordinate else { return }
+        // Bỏ các điểm cũ hoặc sai số quá lớn để mũi tên không nhảy lung tung.
+        guard let location = locations.last,
+              location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy < 200 || lastKnownCoordinate == nil,
+              abs(location.timestamp.timeIntervalSinceNow) < 30 else { return }
+        let coordinate = location.coordinate
         lastKnownCoordinate = coordinate
         onLocation?(coordinate)
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let reduced = manager.accuracyAuthorization == .reducedAccuracy
+        onReducedAccuracy?(reduced)
+        if reduced {
+            manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: "MyLocalPrecise")
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {

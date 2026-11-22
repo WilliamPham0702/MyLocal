@@ -86,6 +86,10 @@ final class SpoofSession: ObservableObject {
     @Published var arrivedAt: CLLocationCoordinate2D?
     /// Đang tự đi theo đường.
     @Published var isFollowingRoute = false
+    /// Người dùng chỉ cho phép vị trí gần đúng.
+    @Published var reducedAccuracy = false
+    /// Tên của điểm đang chọn (từ tìm kiếm).
+    @Published var pinName: String?
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []
@@ -109,6 +113,9 @@ final class SpoofSession: ObservableObject {
         }
         locationKeeper.onHeading = { [weak self] value in
             Task { @MainActor in self?.heading = value }
+        }
+        locationKeeper.onReducedAccuracy = { [weak self] reduced in
+            Task { @MainActor in self?.reducedAccuracy = reduced }
         }
     }
 

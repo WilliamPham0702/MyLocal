@@ -44,7 +44,7 @@ struct MapHomeView: View {
             // finger position. Ignoring the safe area makes the tiles full-bleed but
             // shifts convert() upward by ~status-bar height.
             MapReader { proxy in
-                Map(position: $position) {
+                Map(position: $position, interactionModes: [.pan, .zoom, .rotate]) {
                     if let here = arrowDragCoordinate ?? session.simulated ?? session.liveCoordinate {
                         Annotation("", coordinate: here, anchor: .center) {
                             RedArrowMarker(
@@ -67,6 +67,7 @@ struct MapHomeView: View {
                                         pendingDestination = dest
                                         session.pin = dest
                                         pinPlaceName = nil
+                                        session.pinName = nil
                                         showGoDialog = true
                                     }
                                     arrowDragCoordinate = nil
@@ -210,6 +211,7 @@ struct MapHomeView: View {
         } else {
             session.pin = coord
             pinPlaceName = nil
+            session.pinName = nil
             pinSelected = false
         }
     }
@@ -432,6 +434,7 @@ struct MapHomeView: View {
     private func goTo(coordinate coord: CLLocationCoordinate2D) {
         session.pin = coord
         pinPlaceName = nil
+        session.pinName = nil
         pinSelected = false
         position = .region(MKCoordinateRegion(center: coord, latitudinalMeters: 1200, longitudinalMeters: 1200))
         searchText = ""
@@ -449,11 +452,11 @@ struct MapHomeView: View {
                 await MainActor.run {
                     session.pin = coord
                     pinPlaceName = title
+                    session.pinName = title
                     position = .region(MKCoordinateRegion(center: coord, latitudinalMeters: 1200, longitudinalMeters: 1200))
                     searchText = ""
                     search.query = ""
                     searchFocused = false
-                    session.addFavorite(name: title, coordinate: coord)
                     session.pushNamedRecent(name: title, coordinate: coord)
                 }
             }

@@ -12,16 +12,19 @@ enum LocationEngineError: LocalizedError {
     case notActive
 
     var errorDescription: String? {
+        let base: String
         switch self {
-        case .invalidIP: return "IP đường hầm không hợp lệ. Vào Cài đặt → IP đường hầm (thường là 10.7.0.1)."
-        case .pairingRead: return "Không đọc được file pairing. Hãy nhập lại file pairing của SideStore (.mobiledevicepairing)."
-        case .tunnelCreate: return "Không mở được đường hầm developer. LocalDevVPN đã bật và đang dùng Wi‑Fi chưa?"
-        case .remoteServer: return "Đã vào đường hầm nhưng bắt tay RemoteXPC thất bại."
-        case .simulationCreate: return "Không mở được dịch vụ giả lập vị trí của Apple."
-        case .locationSet: return "Không đặt được tọa độ giả lập."
-        case .locationClear: return "Không xóa được vị trí giả lập."
-        case .notActive: return "Chưa có phiên giả lập nào đang chạy."
+        case .invalidIP: base = "IP đường hầm không hợp lệ. Vào Cài đặt → IP đường hầm (thường là 10.7.0.1)."
+        case .pairingRead: base = "Không đọc được file pairing. Vào Cài đặt › Ghép nối ngay trên iPhone để tạo lại."
+        case .tunnelCreate: base = "Không mở được đường hầm developer. Kiểm tra: LocalDevVPN đang bật, đang dùng Wi‑Fi. iOS 26.4 trở lên phải ghép nối lại: Cài đặt › Ghép nối ngay trên iPhone."
+        case .remoteServer: base = "Đã vào đường hầm nhưng bắt tay RemoteXPC thất bại."
+        case .simulationCreate: base = "Không mở được dịch vụ giả lập vị trí của Apple."
+        case .locationSet: base = "Không đặt được tọa độ giả lập."
+        case .locationClear: base = "Không xóa được vị trí giả lập."
+        case .notActive: base = "Chưa có phiên giả lập nào đang chạy."
         }
+        let detail = LocationEngine.lastDetail
+        return detail.isEmpty ? base : base + "\n\nChi tiết: " + detail
     }
 
     static func from(code: Int32) -> LocationEngineError {
@@ -57,6 +60,16 @@ enum LocationEngine {
     private static let locationClear: Int32 = 12
 
     static var isSessionActive: Bool { locationSimulation != nil }
+
+    /// Thông báo lỗi gốc từ thư viện idevice (để chẩn đoán).
+    static var lastDetail = ""
+
+    /// Ghi lại lỗi gốc rồi giải phóng.
+    private static func note(_ err: UnsafeMutablePointer<IdeviceFfiError>, _ stage: String) {
+        let message = err.pointee.message.map { String(cString: $0) } ?? ""
+        lastDetail = "\(stage) [\(err.pointee.code)] \(message)"
+        idevice_error_free(err)
+    }
 
     static func set(latitude: Double, longitude: Double, pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
         var result: Result<Void, LocationEngineError> = .failure(.locationSet)
@@ -96,9 +109,10 @@ enum LocationEngine {
     }
 
     private static func setLocked(latitude: Double, longitude: Double, pairingPath: String, deviceIP: String) -> Int32 {
+        lastDetail = ""
         if let locationSimulation {
             if let err = location_simulation_set(locationSimulation, latitude, longitude) {
-                idevice_error_free(err)
+                note(err, "set (phiên cũ)")
                 cleanup()
             } else {
                 return ok
@@ -114,7 +128,7 @@ enum LocationEngine {
         // 1) File RPPairing (tạo bằng idevice_pair)
         var rpHandle: OpaquePointer?
         if let rpError = pairingPath.withCString({ rp_pairing_file_read($0, &rpHandle) }) {
-            idevice_error_free(rpError)
+            note(rpError, "đọc RPPairing")
             rpHandle = nil
         }
 
@@ -135,7 +149,7 @@ enum LocationEngine {
                 }
             }
             if let providerError {
-                idevice_error_free(providerError)
+                note(providerError, "tạo đường hầm RPPairing")
                 cleanup()
                 return tunnelCreate
             }
@@ -150,13 +164,13 @@ enum LocationEngine {
         }
 
         if let remoteServerError = remote_server_connect_rsd(adapter, handshake, &remoteServer) {
-            idevice_error_free(remoteServerError)
+            note(remoteServerError, "kết nối RemoteServer")
             cleanup()
             return remoteServerCode
         }
 
         if let simError = location_simulation_new(remoteServer, &locationSimulation) {
-            idevice_error_free(simError)
+            note(simError, "mở location_simulation")
             cleanup()
             return simulationCreate
         }
@@ -164,7 +178,7 @@ enum LocationEngine {
         remoteServer = nil
 
         if let setError = location_simulation_set(locationSimulation, latitude, longitude) {
-            idevice_error_free(setError)
+            note(setError, "đặt tọa độ")
             cleanup()
             return locationSet
         }
@@ -180,7 +194,7 @@ enum LocationEngine {
 
         var pairingFile: OpaquePointer?
         if let err = pairingPath.withCString({ idevice_pairing_file_read($0, &pairingFile) }) {
-            idevice_error_free(err)
+            note(err, "đọc file pairing SideStore")
             return pairingRead
         }
         guard let pairingFile else { return pairingRead }
@@ -193,7 +207,7 @@ enum LocationEngine {
             }
         }
         if let providerError {
-            idevice_error_free(providerError)
+            note(providerError, "kết nối lockdown 62078")
             return tunnelCreate
         }
         guard let provider else { return tunnelCreate }
@@ -201,33 +215,33 @@ enum LocationEngine {
 
         var proxy: OpaquePointer?
         if let err = core_device_proxy_connect(provider, &proxy) {
-            idevice_error_free(err)
+            note(err, "CoreDeviceProxy")
             return tunnelCreate
         }
         guard let proxy else { return tunnelCreate }
 
         var rsdPort: UInt16 = 0
         if let err = core_device_proxy_get_server_rsd_port(proxy, &rsdPort) {
-            idevice_error_free(err)
+            note(err, "lấy cổng RSD")
             core_device_proxy_free(proxy)
             return tunnelCreate
         }
 
         // proxy bị adapter tiêu thụ.
         if let err = core_device_proxy_create_tcp_adapter(proxy, &adapter) {
-            idevice_error_free(err)
+            note(err, "tạo TCP adapter")
             return tunnelCreate
         }
 
         var stream: OpaquePointer?
         if let err = adapter_connect(adapter, rsdPort, &stream) {
-            idevice_error_free(err)
+            note(err, "kết nối cổng RSD")
             return remoteServerCode
         }
 
         // stream bị handshake tiêu thụ.
         if let err = rsd_handshake_new(stream, &handshake) {
-            idevice_error_free(err)
+            note(err, "bắt tay RSD")
             return remoteServerCode
         }
         return ok
@@ -238,7 +252,7 @@ enum LocationEngine {
         let err = location_simulation_clear(locationSimulation)
         cleanup()
         if let err {
-            idevice_error_free(err)
+            note(err, "xóa giả lập")
             return locationClear
         }
         return ok

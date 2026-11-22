@@ -15,9 +15,25 @@ struct RootView: View {
             MapHomeView()
 
             VStack(spacing: 10) {
+                if session.reducedAccuracy {
+                    Text("Đang dùng vị trí gần đúng nên mũi tên có thể lệch. Vào Cài đặt › Quyền riêng tư & Bảo mật › Dịch vụ định vị › MyLocal (hoặc LiveContainer) › bật Vị trí chính xác.")
+                        .font(.caption)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
                 if let arrived = session.arrivedAt {
-                    ArrivalCard(coordinate: arrived)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    ArrivalCard(coordinate: arrived, title: "Đã tới nơi", placeName: session.pinName) {
+                        session.arrivedAt = nil
+                        session.pin = nil
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if let pin = session.pin, !session.isFollowingRoute, !session.joystickActive {
+                    ArrivalCard(coordinate: pin, title: "Điểm đã chọn", placeName: session.pinName) {
+                        session.pin = nil
+                        session.pinName = nil
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 BottomControlsView(
                     showSettings: $showSettings,
@@ -27,6 +43,7 @@ struct RootView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: session.arrivedAt?.latitude)
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: session.pin?.latitude)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -304,6 +321,9 @@ struct IconButton: View {
 struct ArrivalCard: View {
     @EnvironmentObject private var session: SpoofSession
     let coordinate: CLLocationCoordinate2D
+    var title: String = "Đã tới nơi"
+    var placeName: String? = nil
+    var onClose: () -> Void = {}
 
     @State private var showNameAlert = false
     @State private var nameText = ""
@@ -312,9 +332,10 @@ struct ArrivalCard: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(saved ? "Đã lưu vào Yêu thích" : "Đã tới nơi")
+                Text(saved ? "Đã lưu vào Yêu thích" : title)
                     .font(.subheadline.weight(.bold))
-                Text(String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude))
+                Text(placeName ?? String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude))
+                    .lineLimit(1)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -333,7 +354,7 @@ struct ArrivalCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Lưu điểm này")
             Button {
-                session.arrivedAt = nil
+                onClose()
             } label: {
                 Image(systemName: "xmark")
                     .font(.footnote.weight(.bold))
@@ -361,7 +382,7 @@ struct ArrivalCard: View {
     }
 
     private func prepareName() {
-        let suggested = session.suggestedFavoriteName(for: coordinate)
+        let suggested = session.suggestedFavoriteName(for: coordinate, fallback: placeName)
         nameText = suggested
         // Gợi ý tên đường nếu có.
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)

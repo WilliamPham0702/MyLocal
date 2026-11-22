@@ -42,6 +42,11 @@
 	<string>App dùng vị trí thật để căn bản đồ và quay về vị trí thật sau khi dịch chuyển.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>App giữ một phiên định vị nhẹ để vị trí giả lập vẫn chạy khi app ở chế độ nền.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>MyLocalPrecise</key>
+		<string>Cần vị trí chính xác để mũi tên đỏ hiện đúng chỗ bạn đang đứng.</string>
+	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>App dùng mạng cục bộ để kết nối đường hầm developer (LocalDevVPN) khi giả lập vị trí.</string>
 	<key>NSBonjourServices</key>

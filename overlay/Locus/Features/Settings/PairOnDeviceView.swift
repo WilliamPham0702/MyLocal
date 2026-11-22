@@ -23,7 +23,7 @@ struct PairOnDeviceView: View {
                 NavigationStack {
                     scrollContent
                         .background(Color.black.ignoresSafeArea())
-                        .navigationTitle("Pair on this iPhone")
+                        .navigationTitle("Ghép nối trên iPhone")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
@@ -77,7 +77,7 @@ struct PairOnDeviceView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Không cần máy tính")
                 .font(.title2.weight(.bold))
-            Text("Locus advertises a pairable host. iOS connects from Developer Mode, then Locus shows a 6-digit code for you to type.")
+            Text("App phát tín hiệu ghép nối. iOS kết nối từ mục Chế độ nhà phát triển, rồi app hiện mã 6 số để bạn nhập.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -87,7 +87,7 @@ struct PairOnDeviceView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Làm theo các bước sau")
                 .font(.headline)
-            Text("Keep Locus open. You’ll leave briefly for Settings, then come back with a code.")
+            Text("Để app mở. Bạn sang Cài đặt một lát rồi quay lại lấy mã.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -96,9 +96,9 @@ struct PairOnDeviceView: View {
     private var steps: some View {
         VStack(alignment: .leading, spacing: 12) {
             step(1, "Tap Start pairing and allow Local Network + Location when asked.")
-            step(2, "Allow notifications — the code can appear as a banner over Settings.")
-            step(3, "Open Settings › Privacy & Security › Developer Mode › Pair with Locus → Pair.")
-            step(4, "Enter your unlock passcode first. On the next prompt, type Locus’s 6-digit code.")
+            step(2, "Cho phép thông báo để mã hiện ngay trên màn hình Cài đặt.")
+            step(3, "Mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển › Ghép nối với máy chủ (Pair with Host) › chọn Locus › Ghép nối.")
+            step(4, "Nhập mật mã mở khóa iPhone trước. Ở ô tiếp theo, nhập mã 6 số app hiện ra.")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,7 +123,7 @@ struct PairOnDeviceView: View {
             Label("Nếu chưa thấy mã", systemImage: "lightbulb.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(LocusTheme.accentSecondary)
-            Text("Keep the app listening while you confirm in Developer Mode. Don’t force-quit. If “Pair with Locus” vanishes, stop/start pairing and reopen Developer Mode.")
+            Text("Không tắt hẳn app trong lúc xác nhận. Nếu mục Locus biến mất, bấm Thử lại rồi mở lại Chế độ nhà phát triển.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -143,7 +143,7 @@ struct PairOnDeviceView: View {
                 ProgressView()
                 Text("Đang chờ Cài đặt…")
                     .font(.headline)
-                Text("In Developer Mode tap Pair with Locus → Pair.")
+                Text("Trong Chế độ nhà phát triển, chọn Locus › Ghép nối.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -236,7 +236,7 @@ struct PairOnDeviceView: View {
                 switch host.phase {
                 case .awaitingPIN: return "Nhập mã trên vào ô thứ hai trong Cài đặt."
                 case .deviceConnected: return "Đã kết nối, mã sắp hiện."
-                default: return "Waiting for iOS to connect… don’t force-quit Locus."
+                default: return "Đang chờ iOS kết nối… đừng tắt hẳn app."
                 }
             }())
                 .font(.caption)
