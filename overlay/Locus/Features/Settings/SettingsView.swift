@@ -14,8 +14,9 @@ struct SettingsView: View {
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
     @Environment(\.scenePhase) private var scenePhase
 
-    // Luôn hiện nút ghép nối trên iPhone: app build bằng SDK cũ có thể đọc sai phiên bản iOS.
-    private var supportsOnDevicePairing: Bool { true }
+    private var supportsOnDevicePairing: Bool {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+    }
 
     private var detectedOSText: String {
         var size = 0
@@ -67,7 +68,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Ghép nối developer")
                 } footer: {
-                    Text("iOS 27: bấm Ghép nối ngay trên iPhone, không cần máy tính. iOS 26: cần file RPPairing tạo bằng idevice_pair trên máy tính. Nếu chạy trong LiveContainer mà không thấy Locus ở mục Pair with Host, hãy cài MyLocal trực tiếp bằng SideStore.\n\n" + detectedOSText)
+                    Text("iOS 26: cần file RPPairing tạo 1 lần bằng idevice_pair trên máy tính (file của SideStore không dùng được). iOS 27: bấm Ghép nối ngay trên iPhone.\n\n" + detectedOSText)
                 }
 
                 Section {
