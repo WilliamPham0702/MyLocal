@@ -1,0 +1,72 @@
+name: Build IPA chua ky
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+env:
+  # Ban Locus goc dung lam nen (21/11/2026). Doi SHA nay neu muon cap nhat len ban moi.
+  LOCUS_REPO: https://github.com/ChrisMack32/Locus.git
+  LOCUS_SHA: bd0c1c39509ddc76ffe2c295624df903132b556f
+  IPA_NAME: DoiViTri
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Lay code repo nay
+        uses: actions/checkout@v4
+
+      - name: Chon Xcode moi nhat (can Xcode 26 tro len)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Tai ma nguon Locus goc
+        run: |
+          git clone "$LOCUS_REPO" upstream
+          cd upstream
+          git checkout "$LOCUS_SHA"
+
+      - name: Ap ban Viet hoa (overlay)
+        run: cp -R overlay/. upstream/
+
+      - name: Tao Xcode project
+        run: |
+          brew install xcodegen
+          cd upstream
+          xcodegen generate
+
+      - name: Build (khong ky)
+        run: |
+          cd upstream
+          xcodebuild \
+            -project Locus.xcodeproj \
+            -scheme Locus \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Dong goi IPA
+        run: |
+          cd upstream
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          echo "App: $APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "../${IPA_NAME}.ipa" Payload
+          ls -lh "../${IPA_NAME}.ipa"
+
+      - name: Tai IPA len Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IPA_NAME }}-unsigned
+          path: ${{ env.IPA_NAME }}.ipa
+          if-no-files-found: error
