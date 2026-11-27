@@ -90,6 +90,15 @@ final class SpoofSession: ObservableObject {
     @Published var reducedAccuracy = false
     /// Tên của điểm đang chọn (từ tìm kiếm).
     @Published var pinName: String?
+    /// Điểm A (xuất phát). Nếu có `pin` thì `pin` là điểm B (đích).
+    @Published var pointA: CLLocationCoordinate2D?
+    /// Mở bảng Di chuyển (tự động / thủ công, chọn phương tiện).
+    @Published var showMoveSheet = false
+
+    /// Đích của lần di chuyển: B nếu có, không thì chính A.
+    var routeDestination: CLLocationCoordinate2D? { pin ?? pointA }
+    /// Xuất phát: A khi đã có cả A lẫn B; nil nghĩa là dùng vị trí thật hiện tại.
+    var routeOrigin: CLLocationCoordinate2D? { pin != nil ? pointA : nil }
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []

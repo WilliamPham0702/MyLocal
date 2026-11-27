@@ -25,9 +25,9 @@ struct MapHomeView: View {
     /// Mũi tên đỏ: vị trí tạm khi đang kéo.
     @State private var arrowDragCoordinate: CLLocationCoordinate2D?
     @State private var isDraggingArrow = false
-    /// Điểm vừa thả mũi tên → hỏi Nhảy tới / Đi tới.
-    @State private var pendingDestination: CLLocationCoordinate2D?
-    @State private var showGoDialog = false
+    /// Đang chấm điểm đường thủ công (chạm bản đồ để thêm điểm).
+    @State private var manualRouteActive = false
+    @State private var moveStyle: MoveDrawStyle = .auto
 
     private var mapStyle: MapStyle {
         switch session.mapStyleIndex {
@@ -64,11 +64,10 @@ struct MapHomeView: View {
                                 onDragEnded: {
                                     isDraggingArrow = false
                                     if let dest = arrowDragCoordinate {
-                                        pendingDestination = dest
+                                        // Chỉ ghim điểm đến; không tự dịch chuyển.
                                         session.pin = dest
                                         pinPlaceName = nil
                                         session.pinName = nil
-                                        showGoDialog = true
                                     }
                                     arrowDragCoordinate = nil
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -76,6 +75,17 @@ struct MapHomeView: View {
                                     }
                                 }
                             )
+                        }
+                    }
+
+                    if let a = session.pointA {
+                        Annotation("", coordinate: a, anchor: .center) {
+                            Text("A")
+                                .font(.caption.weight(.heavy))
+                                .foregroundStyle(.white)
+                                .frame(width: 26, height: 26)
+                                .background(Circle().fill(LocusTheme.accentSecondary))
+                                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                         }
                     }
 
@@ -151,6 +161,8 @@ struct MapHomeView: View {
         }
         .onChange(of: session.pin?.latitude) { _, newValue in
             if newValue == nil { pinSelected = false }
+            // Đổi điểm đến thì bỏ đường cũ (trừ lúc đang tự đi theo đường).
+            if !session.isFollowingRoute { routeCoords = [] }
         }
         .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX)) { note in
             guard let url = note.object as? URL else { return }
@@ -161,29 +173,23 @@ struct MapHomeView: View {
                 importGPX(url)
             }
         }
-        .confirmationDialog(
-            "Đến điểm này bằng cách nào?",
-            isPresented: $showGoDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Nhảy tới ngay") {
-                if let dest = pendingDestination {
-                    routeCoords = []
-                    session.teleport(to: dest, pairing: pairing)
-                }
-                pendingDestination = nil
+        .sheet(isPresented: $session.showMoveSheet) {
+            if let dest = session.routeDestination {
+                MoveSheet(
+                    origin: session.routeOrigin,
+                    destination: dest,
+                    routePreview: routeCoords,
+                    style: $moveStyle,
+                    isRouting: $isRouting,
+                    onBuildAuto: buildAutoRoute,
+                    onStartManual: {
+                        session.showMoveSheet = false
+                        beginManualRoute()
+                    },
+                    onGo: { startMove(routeCoords) }
+                )
+                .presentationDetents([.medium, .large])
             }
-            Button("Đi tới theo đường (\(session.travelMode.title))") {
-                if let dest = pendingDestination {
-                    travel(to: dest)
-                }
-                pendingDestination = nil
-            }
-            Button("Hủy", role: .cancel) {
-                pendingDestination = nil
-            }
-        } message: {
-            Text("Nhảy tới: đổi vị trí ngay. Đi tới: di chuyển dần theo đường phố với kiểu đang chọn (đi bộ, chạy, xe đạp, ô tô).")
         }
         .sheet(isPresented: $showRouteSheet) {
             RoutePlannerSheet(
@@ -222,6 +228,10 @@ struct MapHomeView: View {
 
             searchBar
 
+            if manualRouteActive {
+                manualBar
+            }
+
             if let coord = Self.parseCoordinate(searchText) {
                 coordinateResult(coord)
             } else if !searchText.isEmpty && !search.results.isEmpty {
@@ -237,6 +247,30 @@ struct MapHomeView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 2)
         .safeAreaPadding(.top, 8)
+    }
+
+    /// Thanh hiện khi đang chấm đường thủ công.
+    private var manualBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "pencil.tip")
+                .foregroundStyle(LocusTheme.accentSecondary)
+            Text("Chạm bản đồ để thêm điểm (\(drawnPath.count))")
+                .font(.subheadline.weight(.semibold))
+            Spacer(minLength: 0)
+            Button("Hủy") {
+                cancelManualRoute()
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            Button("Bắt đầu") {
+                finishManualRoute()
+            }
+            .font(.subheadline.weight(.bold))
+            .buttonStyle(.plain)
+            .foregroundStyle(LocusTheme.accent)
+        }
+        .padding(12)
+        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var searchBar: some View {
@@ -463,32 +497,77 @@ struct MapHomeView: View {
         }
     }
 
-    /// Đi dần từ vị trí hiện tại tới đích theo đường phố.
-    private func travel(to destination: CLLocationCoordinate2D) {
-        guard pairing.hasPairingFile else {
-            session.lastError = "Hãy nhập file pairing trong Cài đặt trước."
+    /// Tự tính đường theo phố từ điểm xuất phát (A hoặc vị trí thật) tới đích (B hoặc A).
+    private func buildAutoRoute() {
+        guard let end = session.routeDestination else {
+            session.lastError = "Hãy chạm bản đồ để chọn điểm đến."
             return
         }
-        guard let start = session.simulated ?? session.liveCoordinate ?? session.realCoordinate else {
-            session.teleport(to: destination, pairing: pairing)
+        guard let start = session.routeOrigin ?? session.realCoordinate else {
+            session.lastError = "Chưa có vị trí thật để xuất phát. Hãy bật định vị hoặc đặt điểm A."
             return
         }
         isRouting = true
         Task {
-            let coords: [CLLocationCoordinate2D]
-            if let road = try? await RouteBuilder.roadRoute(from: start, to: destination, mode: session.travelMode),
-               road.count > 1 {
-                coords = road + [destination]
-            } else {
-                // Không tìm được đường phố → đi thẳng.
-                coords = [start, destination]
-            }
-            await MainActor.run {
-                isRouting = false
-                routeCoords = coords
-                session.followRoute(coords, pairing: pairing)
+            do {
+                let coords = try await RouteBuilder.roadRoute(from: start, to: end, mode: session.travelMode)
+                await MainActor.run {
+                    routeCoords = coords
+                    isRouting = false
+                }
+            } catch {
+                await MainActor.run {
+                    isRouting = false
+                    session.lastError = error.localizedDescription
+                }
             }
         }
+    }
+
+    /// Bắt đầu chấm đường thủ công: đường sẽ là xuất phát → các điểm chạm → đích.
+    private func beginManualRoute() {
+        guard session.routeDestination != nil else {
+            session.lastError = "Hãy chạm bản đồ để chọn điểm đến."
+            return
+        }
+        drawnPath.removeAll()
+        drawMode = true
+        manualRouteActive = true
+    }
+
+    private func finishManualRoute() {
+        guard let end = session.routeDestination else { return }
+        guard let start = session.routeOrigin ?? session.realCoordinate else {
+            session.lastError = "Chưa có vị trí thật để xuất phát. Hãy bật định vị hoặc đặt điểm A."
+            return
+        }
+        let path = [start] + drawnPath + [end]
+        manualRouteActive = false
+        drawMode = false
+        startMove(path)
+    }
+
+    private func cancelManualRoute() {
+        manualRouteActive = false
+        drawMode = false
+        drawnPath.removeAll()
+    }
+
+    /// Đi theo đường đã có. Điểm A (nếu có) được dùng xong thì xóa.
+    private func startMove(_ path: [CLLocationCoordinate2D]) {
+        guard pairing.hasPairingFile else {
+            session.lastError = "Hãy nhập file pairing trong Cài đặt trước."
+            return
+        }
+        guard path.count >= 2 else {
+            session.lastError = "Hãy tạo hoặc vẽ đường đi trước."
+            return
+        }
+        routeCoords = path
+        drawnPath.removeAll()
+        session.pointA = nil
+        session.showMoveSheet = false
+        session.followRoute(path, pairing: pairing)
     }
 
     private func buildRoadRoute() {

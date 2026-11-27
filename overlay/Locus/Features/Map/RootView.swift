@@ -28,12 +28,9 @@ struct RootView: View {
                         session.pin = nil
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                } else if let pin = session.pin, !session.isFollowingRoute, !session.joystickActive {
-                    ArrivalCard(coordinate: pin, title: "Điểm đã chọn", placeName: session.pinName) {
-                        session.pin = nil
-                        session.pinName = nil
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if session.routeDestination != nil, !session.isFollowingRoute, !session.joystickActive {
+                    PinActionCard()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 BottomControlsView(
                     showSettings: $showSettings,
