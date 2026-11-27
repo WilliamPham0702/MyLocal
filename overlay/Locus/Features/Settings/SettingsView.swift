@@ -255,7 +255,10 @@ struct PlacesView: View {
 
     private func placeButton(_ place: SavedPlace) -> some View {
         Button {
-            session.teleport(to: place.coordinate, pairing: pairing)
+            // Chỉ chọn điểm; việc dịch chuyển hay di chuyển do người dùng chọn ở thẻ dưới bản đồ.
+            session.pointA = nil
+            session.pin = place.coordinate
+            session.pinName = place.name
             dismiss()
         } label: {
             VStack(alignment: .leading, spacing: 2) {
