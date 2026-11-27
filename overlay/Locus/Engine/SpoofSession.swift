@@ -94,6 +94,8 @@ final class SpoofSession: ObservableObject {
     @Published var pointA: CLLocationCoordinate2D?
     /// Mở bảng Di chuyển (tự động / thủ công, chọn phương tiện).
     @Published var showMoveSheet = false
+    /// Tăng mỗi lần dịch chuyển xong, để bản đồ đưa camera tới vị trí mới.
+    @Published var recenterToken = 0
 
     /// Đích của lần di chuyển: B nếu có, không thì chính A.
     var routeDestination: CLLocationCoordinate2D? { pin ?? pointA }
@@ -149,6 +151,7 @@ final class SpoofSession: ObservableObject {
            abs(sim.longitude - coordinate.longitude) < 0.000001 {
             arrivedAt = coordinate
         }
+        recenterToken &+= 1
     }
 
     func stop(pairing: PairingStore) {

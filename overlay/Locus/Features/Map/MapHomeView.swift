@@ -9,12 +9,8 @@ struct MapHomeView: View {
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
-    @State private var routeStart: CLLocationCoordinate2D?
-    @State private var routeEnd: CLLocationCoordinate2D?
     @State private var routeCoords: [CLLocationCoordinate2D] = []
     @State private var isRouting = false
-    @State private var showRouteSheet = false
-    @State private var showGPXImporter = false
     @State private var drawnPath: [CLLocationCoordinate2D] = []
     @State private var drawMode = false
     @State private var pinSelected = false
@@ -49,6 +45,7 @@ struct MapHomeView: View {
                         Annotation("", coordinate: here, anchor: .center) {
                             RedArrowMarker(
                                 heading: session.heading,
+                                modeIcon: session.isFollowingRoute ? session.travelMode.icon : nil,
                                 isDragging: isDraggingArrow,
                                 onDragBegan: {
                                     searchFocused = false
@@ -164,14 +161,13 @@ struct MapHomeView: View {
             // Đổi điểm đến thì bỏ đường cũ (trừ lúc đang tự đi theo đường).
             if !session.isFollowingRoute { routeCoords = [] }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .locusImportGPX)) { note in
-            guard let url = note.object as? URL else { return }
-            importGPX(url)
+        .onChange(of: session.simulated?.latitude) { _, _ in
+            // Đang đi theo đường: camera luôn bám giữa vị trí giả.
+            if session.isFollowingRoute { recenterOnSimulated() }
         }
-        .fileImporter(isPresented: $showGPXImporter, allowedContentTypes: [.xml, .data], allowsMultipleSelection: false) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                importGPX(url)
-            }
+        .onChange(of: session.recenterToken) { _, _ in
+            // Vừa dịch chuyển: đưa camera tới vị trí mới.
+            recenterOnSimulated()
         }
         .sheet(isPresented: $session.showMoveSheet) {
             if let dest = session.routeDestination {
@@ -191,23 +187,12 @@ struct MapHomeView: View {
                 .presentationDetents([.medium, .large])
             }
         }
-        .sheet(isPresented: $showRouteSheet) {
-            RoutePlannerSheet(
-                start: $routeStart,
-                end: $routeEnd,
-                isRouting: $isRouting,
-                onBuild: buildRoadRoute,
-                onPlay: playRoute,
-                onImportGPX: { showGPXImporter = true },
-                onExportGPX: exportGPX,
-                onUseDrawn: {
-                    routeCoords = RouteBuilder.sample(coordinates: drawnPath, every: 10)
-                    drawnPath.removeAll()
-                    drawMode = false
-                }
-            )
-            .presentationDetents([.medium, .large])
-        }
+    }
+
+    /// Đưa camera về vị trí giả hiện tại (giữ mức zoom gần).
+    private func recenterOnSimulated() {
+        guard let sim = session.simulated else { return }
+        position = .camera(MapCamera(centerCoordinate: sim, distance: 1500))
     }
 
     private func placePin(at point: CGPoint, proxy: MapProxy) {
@@ -346,9 +331,6 @@ struct MapHomeView: View {
         HStack(spacing: 4) {
             chromeIconButton("square.3.layers.3d") {
                 session.mapStyleIndex = (session.mapStyleIndex + 1) % 3
-            }
-            chromeIconButton("point.topleft.down.to.point.bottomright.curvepath") {
-                showRouteSheet = true
             }
             chromeIconButton(drawMode ? "pencil.tip.crop.circle.badge.minus" : "pencil.tip.crop.circle") {
                 drawMode.toggle()
@@ -570,71 +552,6 @@ struct MapHomeView: View {
         session.followRoute(path, pairing: pairing)
     }
 
-    private func buildRoadRoute() {
-        guard let start = routeStart ?? session.simulated ?? session.pin,
-              let end = routeEnd else {
-            session.lastError = "Hãy chọn điểm đầu và điểm cuối."
-            return
-        }
-        isRouting = true
-        Task {
-            do {
-                let coords = try await RouteBuilder.roadRoute(from: start, to: end, mode: session.travelMode)
-                await MainActor.run {
-                    routeCoords = coords
-                    isRouting = false
-                }
-            } catch {
-                await MainActor.run {
-                    isRouting = false
-                    session.lastError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func playRoute() {
-        let path = routeCoords.isEmpty ? drawnPath : routeCoords
-        guard path.count >= 2 else {
-            session.lastError = "Hãy tạo hoặc vẽ đường đi trước."
-            return
-        }
-        showRouteSheet = false
-        session.followRoute(path, pairing: pairing)
-    }
-
-    private func importGPX(_ url: URL) {
-        do {
-            let coords = try GPXCodec.parse(url)
-            routeCoords = RouteBuilder.sample(coordinates: coords, every: 10)
-            if let first = coords.first {
-                session.pin = first
-                position = .region(MKCoordinateRegion(center: first, latitudinalMeters: 2000, longitudinalMeters: 2000))
-            }
-        } catch {
-            session.lastError = error.localizedDescription
-        }
-    }
-
-    private func exportGPX() {
-        let path = routeCoords.isEmpty ? drawnPath : routeCoords
-        guard !path.isEmpty else {
-            session.lastError = "Không có gì để xuất."
-            return
-        }
-        let gpx = GPXCodec.export(path)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Locus-Route.gpx")
-        do {
-            try gpx.data(using: .utf8)?.write(to: url)
-            let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let root = scene.keyWindow?.rootViewController {
-                root.present(av, animated: true)
-            }
-        } catch {
-            session.lastError = error.localizedDescription
-        }
-    }
 }
 
 private extension UIWindowScene {

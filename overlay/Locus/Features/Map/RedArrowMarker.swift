@@ -4,6 +4,8 @@ import UIKit
 /// Mũi tên đỏ chỉ vị trí hiện tại. Giữ rồi kéo để chọn nơi muốn đến.
 struct RedArrowMarker: View {
     var heading: Double
+    /// Khi đang đi theo đường: icon phương tiện (đi bộ, chạy, xe đạp, ô tô). Nil thì hiện mũi tên.
+    var modeIcon: String? = nil
     var isDragging: Bool
     var onDragBegan: () -> Void
     var onDragMoved: (CGPoint) -> Void
@@ -20,10 +22,16 @@ struct RedArrowMarker: View {
                 .fill(.white)
                 .frame(width: 34, height: 34)
                 .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
-            Image(systemName: "location.north.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(red)
-                .rotationEffect(.degrees(heading))
+            if let modeIcon {
+                Image(systemName: modeIcon)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(red)
+            } else {
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(red)
+                    .rotationEffect(.degrees(heading))
+            }
         }
         .scaleEffect(isDragging ? 1.15 : 1)
         .contentShape(Circle())
